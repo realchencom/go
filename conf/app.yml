@@ -1,0 +1,14 @@
+
+host:
+    address: localhost
+    por: 7190
+
+log:
+    path: logs/main.log,
+    level: debug
+    #console or file
+    output: console
+
+datasource:
+
+
