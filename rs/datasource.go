@@ -10,7 +10,7 @@ type Datasource struct {
 	Dsn string `mapstructure:"dsn"`
 }
 
-func (ds *Datasource) getDB() (*gorm.DB, error) {
+func (ds *Datasource) GetDB() (*gorm.DB, error) {
 	if err := Con.Sub("datasource").Unmarshal(&ds); err != nil {
 		panic(fmt.Errorf("unmarshal datasource conf failed, err:%s \n", err))
 	}
