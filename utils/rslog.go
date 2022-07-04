@@ -36,12 +36,12 @@ func init() {
 		return
 	}
 	//配置log.output后将重新生成日志实例，就的logger defer掉
-	defer func(logger *zap.SugaredLogger) {
-		err := logger.Sync()
-		if err != nil {
-			logger.Warnf("logger.Sync() 错误，%s ", err)
-		}
-	}(logger)
+	//defer func(logger *zap.SugaredLogger) {
+	//	err := logger.Sync()
+	//	if err != nil {
+	//		logger.Warnf("logger.Sync() 错误，%s ", err)
+	//	}
+	//}(logger)
 	//var level, path string
 	//level = Con.GetString("log.level")
 	if Log.Level == "" {
