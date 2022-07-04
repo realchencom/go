@@ -26,8 +26,12 @@ func (c *config) load() {
 	c.AddConfigPath(".")       // optionally look for config in the working directory
 	//未找到配置文件，抛出恐慌异常
 	if err := c.ReadInConfig(); err != nil {
-		e := fmt.Errorf("fatal error config file: %w", err)
-		fmt.Println(e.Error())
-		panic(e)
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			// 配置文件未找到错误；如果需要可以忽略
+			panic(err)
+		} else {
+			// 配置文件被找到，但产生了另外的错误
+			panic(fmt.Errorf("Read Configuration fatal error in file: %s \n", err))
+		}
 	}
 }

@@ -1,13 +1,12 @@
-
 host:
-    address: localhost
-    por: 7190
+  address: "localhost"
+  por: 7190
 
 log:
-    path: logs/main.log,
-    level: debug
-    #console or file
-    output: console
+  path: "logs/main.log"
+  level: "debug"
+  #console or file
+  output: "console,file"
 
 datasource:
 

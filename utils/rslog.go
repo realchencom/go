@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"github.com/natefinch/lumberjack"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -8,21 +9,29 @@ import (
 	"time"
 )
 
-type RSLog struct {
+type rsLogger struct {
 	v *zap.SugaredLogger
+}
+type RSLog struct {
+	Path   string `mapstructure:"path"`
+	Level  string `mapstructure:"level"`
+	Output string `mapstructure:"output"`
 }
 
 var (
-	Logger RSLog
+	Logger rsLogger //日志操作类
+	Log    RSLog    //日志实体类
 )
 
 func init() {
-	logger := rsLog("", "info", "console")
-
-	output := Con.GetString("log.output")
-	if output == "" {
-		logger.Warnf("未找到log.output配置，默认%s ", output)
-		output = "console"
+	if err := Con.Sub("log").Unmarshal(&Log); err != nil {
+		panic(fmt.Errorf("unmarshal conf failed, err:%s \n", err))
+	}
+	logger := rsLog(RSLog{"", "info", "console"})
+	//output := Con.GetString("log.output")
+	if Log.Output == "" {
+		logger.Warnf("未找到log.output配置，默认%s ", Log.Output)
+		Log.Output = "console"
 		Logger.v = logger
 		return
 	}
@@ -30,61 +39,59 @@ func init() {
 	defer func(logger *zap.SugaredLogger) {
 		err := logger.Sync()
 		if err != nil {
-
+			logger.Warnf("logger.Sync() 错误，%s ", err)
 		}
 	}(logger)
-	var level, path string
-	level = Con.GetString("log.level")
-	if level == "" {
-		level = "info"
-		logger.Warnf("未找到log.level配置，默认%s ", level)
+	//var level, path string
+	//level = Con.GetString("log.level")
+	if Log.Level == "" {
+		Log.Level = "info"
+		logger.Warnf("未找到log.level配置，默认%s ", Log.Level)
 	}
-	if output == "console" {
-		Logger.v = rsLog("", level, output)
+	if Log.Output == "console" {
+		Log.Path = ""
+		Logger.v = rsLog(Log)
 		goto finish
 	}
-	path = Con.GetString("log.path")
-	if path == "" {
-		path = "./main.log"
-		logger.Warnf("未找到log.path配置，默认%s ", path)
+	//path = Con.GetString("log.path")
+	if Log.Path == "" {
+		Log.Path = "./main.log"
+		logger.Warnf("未找到log.path配置，默认%s ", Log.Path)
 	}
-	Logger.v = rsLog(path, level, output)
+	Logger.v = rsLog(Log)
 finish:
 	Logger.v.Info("Zap log init success")
 }
 
-func (rs *RSLog) Debug(template string, args ...interface{}) {
+func (rs *rsLogger) Debug(template string, args ...interface{}) {
 	rs.v.Debugf(template, args...)
 }
-func (rs *RSLog) Info(template string, args ...interface{}) {
+func (rs *rsLogger) Info(template string, args ...interface{}) {
 	rs.v.Infof(template, args...)
 }
-func (rs *RSLog) Warn(template string, args ...interface{}) {
+func (rs *rsLogger) Warn(template string, args ...interface{}) {
 	rs.v.Warnf(template, args...)
 }
-func (rs *RSLog) Error(template string, args ...interface{}) {
+func (rs *rsLogger) Error(template string, args ...interface{}) {
 	rs.v.Errorf(template, args...)
 }
-func (rs *RSLog) DPanic(template string, args ...interface{}) {
+func (rs *rsLogger) DPanic(template string, args ...interface{}) {
 	rs.v.DPanicf(template, args...)
 }
-func (rs *RSLog) Panic(template string, args ...interface{}) {
+func (rs *rsLogger) Panic(template string, args ...interface{}) {
 	rs.v.Panicf(template, args...)
 }
-func (rs *RSLog) Fatal(template string, args ...interface{}) {
+func (rs *rsLogger) Fatal(template string, args ...interface{}) {
 	rs.v.Fatalf(template, args...)
 }
 
-func (rs *RSLog) Sync() {
-	err := rs.v.Sync()
-	if err != nil {
-		return
-	}
+func (rs *rsLogger) Sync() error {
+	return rs.v.Sync()
 }
 
 // logpath 日志文件路径
 // loglevel 日志级别
-func rsLog(path string, level string, output string) *zap.SugaredLogger {
+func rsLog(log RSLog) *zap.SugaredLogger {
 	config := zapcore.EncoderConfig{
 		MessageKey:  "msg",   //结构化（json）输出：msg的key
 		LevelKey:    "level", //结构化（json）输出：日志级别的key（INFO，WARN，ERROR等）
@@ -105,11 +112,10 @@ func rsLog(path string, level string, output string) *zap.SugaredLogger {
 	// 设置日志级别,debug可以打印出info,debug,warn；info级别可以打印warn，info；warn只能打印warn
 	// debug->info->warn->error
 	var logLevel zapcore.Level
-	switch level {
+	switch log.Level {
 	case "debug":
 		//自定义日志级别：自定义Warn级别
 		logLevel = zapcore.DebugLevel
-
 	case "info":
 		logLevel = zapcore.InfoLevel
 	case "warn":
@@ -123,31 +129,37 @@ func rsLog(path string, level string, output string) *zap.SugaredLogger {
 	case "fatal":
 		logLevel = zapcore.FatalLevel
 	}
+	var core zapcore.Core
 	var out zapcore.WriteSyncer
-	if output == "console" {
-		// 实现多个输出
-		//core := zapcore.NewTee(
-		//	zapcore.NewCore(zapcore.NewConsoleEncoder(config), zapcore.AddSync(infoWriter), infoLevel),                         //将info及以下写入logPath，NewConsoleEncoder 是非结构化输出
-		//	zapcore.NewCore(zapcore.NewConsoleEncoder(config), zapcore.AddSync(warnWriter), warnLevel),                         //warn及以上写入errPath
-		//	zapcore.NewCore(zapcore.NewJSONEncoder(config), zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout)), logLevel), //同时将日志输出到控制台，NewJSONEncoder 是结构化输出
-		//)
-		out = zapcore.AddSync(os.Stdout)
-	} else if output == "file" {
-		hook := lumberjack.Logger{
-			Filename:   path, // 日志文件路径
-			MaxSize:    128,  // megabytes
-			MaxBackups: 30,   // 最多保留30个备份
-			MaxAge:     7,    // days
-			Compress:   true, // 是否压缩 disabled by default
+	if log.Output == "console" || log.Output == "file" {
+		if log.Output == "console" {
+			out = zapcore.AddSync(os.Stdout)
+		} else if log.Output == "file" {
+			out = getWriter(log.Path)
 		}
-		out = zapcore.AddSync(&hook)
-	}
+		core = zapcore.NewCore(
+			zapcore.NewConsoleEncoder(config),
+			out,
+			logLevel,
+		)
+	} else if log.Output == "console,file" || log.Output == "file,console" {
 
-	core := zapcore.NewCore(
-		zapcore.NewConsoleEncoder(config),
-		out,
-		logLevel,
-	)
-	log := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zap.WarnLevel))
-	return log.Sugar()
+		// 实现多个输出
+		core = zapcore.NewTee(
+			zapcore.NewCore(zapcore.NewConsoleEncoder(config), getWriter(log.Path), logLevel),                                     //warn及以上写入errPath
+			zapcore.NewCore(zapcore.NewConsoleEncoder(config), zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout)), logLevel), //同时将日志输出到控制台，NewJSONEncoder 是结构化输出
+		)
+	}
+	logger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zap.WarnLevel))
+	return logger.Sugar()
+}
+func getWriter(path string) zapcore.WriteSyncer {
+	hook := lumberjack.Logger{
+		Filename:   path, // 日志文件路径
+		MaxSize:    128,  // megabytes
+		MaxBackups: 30,   // 最多保留30个备份
+		MaxAge:     7,    // days
+		Compress:   true, // 是否压缩 disabled by default
+	}
+	return zapcore.AddSync(&hook)
 }
