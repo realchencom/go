@@ -1,8 +1,13 @@
-package utils
+package rs
 
 import "testing"
 
 func TestLog(t *testing.T) {
-	defer Logger.Sync()
-	Logger.Debug("年后")
+	defer func(Log *Logger) {
+		err := Log.Sync()
+		if err != nil {
+
+		}
+	}(&Log)
+	Log.Debug("年后")
 }

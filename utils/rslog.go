@@ -1,4 +1,4 @@
-package utils
+package rs
 
 import (
 	"fmt"
@@ -9,30 +9,30 @@ import (
 	"time"
 )
 
-type rsLogger struct {
+type Logger struct {
 	v *zap.SugaredLogger
 }
-type RSLog struct {
+type LogConf struct {
 	Path   string `mapstructure:"path"`
 	Level  string `mapstructure:"level"`
 	Output string `mapstructure:"output"`
 }
 
 var (
-	Logger rsLogger //日志操作类
-	Log    RSLog    //日志实体类
+	Log     Logger  //日志操作类
+	logConf LogConf //日志实体类
 )
 
 func init() {
-	if err := Con.Sub("log").Unmarshal(&Log); err != nil {
-		panic(fmt.Errorf("unmarshal conf failed, err:%s \n", err))
+	if err := Con.Sub("log").Unmarshal(&logConf); err != nil {
+		panic(fmt.Errorf("unmarshal log conf failed, err:%s \n", err))
 	}
-	logger := rsLog(RSLog{"", "info", "console"})
+	logger := rsLog(LogConf{"", "info", "console"})
 	//output := Con.GetString("log.output")
-	if Log.Output == "" {
-		logger.Warnf("未找到log.output配置，默认%s ", Log.Output)
-		Log.Output = "console"
-		Logger.v = logger
+	if logConf.Output == "" {
+		logger.Warnf("未找到log.output配置，默认%s ", logConf.Output)
+		logConf.Output = "console"
+		Log.v = logger
 		return
 	}
 	//配置log.output后将重新生成日志实例，就的logger defer掉
@@ -44,54 +44,54 @@ func init() {
 	//}(logger)
 	//var level, path string
 	//level = Con.GetString("log.level")
-	if Log.Level == "" {
-		Log.Level = "info"
-		logger.Warnf("未找到log.level配置，默认%s ", Log.Level)
+	if logConf.Level == "" {
+		logConf.Level = "info"
+		logger.Warnf("未找到log.level配置，默认%s ", logConf.Level)
 	}
-	if Log.Output == "console" {
-		Log.Path = ""
-		Logger.v = rsLog(Log)
+	if logConf.Output == "console" {
+		logConf.Path = ""
+		Log.v = rsLog(logConf)
 		goto finish
 	}
 	//path = Con.GetString("log.path")
-	if Log.Path == "" {
-		Log.Path = "./main.log"
-		logger.Warnf("未找到log.path配置，默认%s ", Log.Path)
+	if logConf.Path == "" {
+		logConf.Path = "./main.log"
+		logger.Warnf("未找到log.path配置，默认%s ", logConf.Path)
 	}
-	Logger.v = rsLog(Log)
+	Log.v = rsLog(logConf)
 finish:
-	Logger.v.Info("Zap log init success")
+	Log.v.Info("Zap log init success")
 }
 
-func (rs *rsLogger) Debug(template string, args ...interface{}) {
+func (rs *Logger) Debug(template string, args ...interface{}) {
 	rs.v.Debugf(template, args...)
 }
-func (rs *rsLogger) Info(template string, args ...interface{}) {
+func (rs *Logger) Info(template string, args ...interface{}) {
 	rs.v.Infof(template, args...)
 }
-func (rs *rsLogger) Warn(template string, args ...interface{}) {
+func (rs *Logger) Warn(template string, args ...interface{}) {
 	rs.v.Warnf(template, args...)
 }
-func (rs *rsLogger) Error(template string, args ...interface{}) {
+func (rs *Logger) Error(template string, args ...interface{}) {
 	rs.v.Errorf(template, args...)
 }
-func (rs *rsLogger) DPanic(template string, args ...interface{}) {
+func (rs *Logger) DPanic(template string, args ...interface{}) {
 	rs.v.DPanicf(template, args...)
 }
-func (rs *rsLogger) Panic(template string, args ...interface{}) {
+func (rs *Logger) Panic(template string, args ...interface{}) {
 	rs.v.Panicf(template, args...)
 }
-func (rs *rsLogger) Fatal(template string, args ...interface{}) {
+func (rs *Logger) Fatal(template string, args ...interface{}) {
 	rs.v.Fatalf(template, args...)
 }
 
-func (rs *rsLogger) Sync() error {
+func (rs *Logger) Sync() error {
 	return rs.v.Sync()
 }
 
 // logpath 日志文件路径
 // loglevel 日志级别
-func rsLog(log RSLog) *zap.SugaredLogger {
+func rsLog(log LogConf) *zap.SugaredLogger {
 	config := zapcore.EncoderConfig{
 		MessageKey:  "msg",   //结构化（json）输出：msg的key
 		LevelKey:    "level", //结构化（json）输出：日志级别的key（INFO，WARN，ERROR等）
